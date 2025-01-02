@@ -14,7 +14,7 @@ This should be legal as long as the Blackbox device is not used during competiti
 No you don't! You can simply download the auton programs into an SD card directly.
 
 ## Feedback
-If you have any issues and would like to give feedback, please feel free to open up an issue.
+If you have any issues or would like to give feedback, please feel free to open up an issue.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
