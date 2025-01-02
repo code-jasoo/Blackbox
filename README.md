@@ -1,6 +1,10 @@
 # Blackbox
 Simple autonomous programming and data transfer for VEX Robotics.
 
+### Dependencies
+[Adafruit_SSD1306 Library](https://github.com/adafruit/Adafruit_SSD1306) (version 2.5.13 used)
+[Adafruit GFX Library](https://github.com/adafruit/Adafruit-GFX-Library) (version 1.11.11 used)
+
 ## Why?
 While developing auton programs for our robot, a majority of the time is waiting for the program to recompile and download onto the robot. To expedite this process, I created Blackbox which can wirelessly download auton programs onto the robot's micro SD card without needing to recompile the entire program.
 
