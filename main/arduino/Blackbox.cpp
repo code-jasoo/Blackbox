@@ -1,6 +1,6 @@
 #include "Arduino.h"
 #include "Blackbox.h"
-#include <Wifi.h>
+#include <WiFi.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -72,28 +72,113 @@ const uint8_t PROGMEM logo[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-Blackbox::Blackbox(int dataOut, int dataIn, int statusPin) {
-    pinMode(dataOut, OUTPUT);
-    pinMode(dataIn, INPUT);
-    pinMode(statusPin, OUTPUT);
-    _dataOut = dataOut;
-    _dataIn = dataIn;
-    _statusPin = statusPin;
+Blackbox::Blackbox(int dataOut, int dataIn, int statusPin) {  
+  Serial.begin(9600);
+  pinMode(dataOut, OUTPUT);
+  pinMode(dataIn, INPUT);
+  pinMode(statusPin, OUTPUT);
+  _dataOut = dataOut;
+  _dataIn = dataIn;
+  _statusPin = statusPin;
+  _connectionStatus = false;
+  digitalWrite(_statusPin, HIGH);
 
-    Adafruit_SSD1306 display(128, 64, &Wire, -1);
+  display = Adafruit_SSD1306(128, 64, &Wire, -1);
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
+    for(;;); // Don't proceed, loop forever
+  }
 
+  // Display setup
+  display.setRotation(2);
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
 
+  // Splash
+  display.clearDisplay();
+  display.drawBitmap(0, 0, logo, 128, 64, WHITE);
+  display.display();
+
+  WiFi.softAP("BLACKBOX", "blackbox");
+
+  digitalWrite(_statusPin, LOW);
+    
+  delay(1000);   
 }
 
-void Blackbox::begin() {
+void Blackbox::update() {
+  // Every second without delaying
+  if (millis() % 1000 == 0) {
+    Blackbox::updateScreen();
+  }
+  if (millis() % 500 == 0 && !_connectionStatus) {
+    int buffer[1024];
+    Blackbox::ping();
+    Blackbox::receive(buffer, 1024, 100);
+  }
+}
 
+void Blackbox::updateScreen() {
+  display.clearDisplay();
+
+  display.drawBitmap(0, -24, logo, 128, 64, WHITE);
+  // Display IP Address and connection status
+  display.setCursor(0,24);
+  display.print(F("IP: "));
+  display.println(WiFi.softAPIP());
+  display.print(F("Connected: "));
+  display.println(_connectionStatus);
+  display.display();
+}
+
+
+// Connection ping
+void Blackbox::ping() {
+  pulse(10);
+}
+
+void Blackbox::receive(int* buffer, int size, int timeout) {
+  int lastMillis = millis();
+  int startPulse = 0;
+  int pulseTime = 0;
+  int i = 0;
+  for (;;) {
+    // Timeout
+    if (millis() - lastMillis >= timeout) {
+      Serial.println("Timed out.");
+      break;
+    }
+    // Pulse high (start)
+    if (digitalRead(_dataIn)) {
+      // Reset timeout
+      lastMillis = millis();
+      // Set start of pulse
+      startPulse = millis();
+    // If startPulse was already set and pin is LOW
+    } else if (startPulse != 0 && !digitalRead(_dataIn)) {
+      // Calculate pulse time
+      pulseTime = millis() - startPulse;
+      // Reset pulse start time
+      startPulse = 0;
+
+      if (pulseTime == 10) {
+        buffer[i] = 0;
+      } else if (pulseTime == 20) {
+        buffer[i] = 1;
+      }
+
+      i++;
+      if (i >= size - 1) {
+        break;
+      }
+    }
+  }
 }
 
 void Blackbox::pulse(int ms) {
-    digitalWrite(dataOut, HIGH);
-    digitalWrite(statusPin, HIGH);
-    delay(ms);
-    digitalWrite(dataOut, LOW);
-    digitalWrite(statusPin, LOW);
-    delay(10); // Off delay will always be 10ms
+  digitalWrite(_dataOut, HIGH);
+  digitalWrite(_statusPin, HIGH);
+  delay(ms);
+  digitalWrite(_dataOut, LOW);
+  digitalWrite(_statusPin, LOW);
+  delay(10); // Off delay will always be 10ms
 }
