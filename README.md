@@ -5,6 +5,11 @@ Simple autonomous programming and data transfer for VEX Robotics.
 - [Adafruit_SSD1306 Library](https://github.com/adafruit/Adafruit_SSD1306) (version 2.5.13 used)
 - [Adafruit GFX Library](https://github.com/adafruit/Adafruit-GFX-Library) (version 1.11.11 used)
 
+### How to install
+- Clone this repository and add the files in the arduino folder to your arduino sketch
+- Refer to the example sketch for usage, or just use the example sketch
+- Add the files in the python folder to a microSD card to put into your VEX V5 Brain
+
 ## Why?
 While developing auton programs for our robot, a majority of the time is waiting for the program to recompile and download onto the robot. To expedite this process, I created Blackbox (along with custom PID commands) which can wirelessly download auton programs onto the robot's micro SD card without needing to recompile the entire program.
 
