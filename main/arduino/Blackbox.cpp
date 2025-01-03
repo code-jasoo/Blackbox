@@ -72,6 +72,13 @@ const uint8_t PROGMEM logo[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+const uint8_t PROGMEM notconnected[] = {
+  0x08, 0x10, 0x04, 0x20, 0x02, 0x40, 0x01, 0x80, 0x01, 0x80, 0x02, 0x40, 0x04, 0x20, 0x08, 0x10, 
+  0x00, 0x00, 0x01, 0x80, 0x06, 0x60, 0x08, 0x10, 0x11, 0x88, 0x02, 0x40, 0x04, 0x20, 0x01, 0x80
+};
+
+const int pingMessage[8] = {1, 1, 1, 1, 0, 0, 0, 0};
+
 Blackbox::Blackbox(int dataOut, int dataIn, int statusPin) {  
   Serial.begin(9600);
   pinMode(dataOut, OUTPUT);
@@ -81,6 +88,8 @@ Blackbox::Blackbox(int dataOut, int dataIn, int statusPin) {
   _dataIn = dataIn;
   _statusPin = statusPin;
   _connectionStatus = false;
+  _clientConnected = false;
+
   digitalWrite(_statusPin, HIGH);
 
   display = Adafruit_SSD1306(128, 64, &Wire, -1);
@@ -99,6 +108,8 @@ Blackbox::Blackbox(int dataOut, int dataIn, int statusPin) {
   display.display();
 
   WiFi.softAP("BLACKBOX", "blackbox");
+  wifiServer = WiFiServer(80);
+  wifiServer.begin();
 
   digitalWrite(_statusPin, LOW);
     
@@ -113,8 +124,13 @@ void Blackbox::update() {
   if (millis() % 500 == 0 && !_connectionStatus) {
     int buffer[1024];
     Blackbox::ping();
-    Blackbox::receive(buffer, 1024, 100);
+    Blackbox::receive(buffer, 1024, 500);
+    if (Blackbox::isMessage(buffer, 1024, (int*)pingMessage, 8)) {
+      _connectionStatus = true;
+    }
   }
+
+  Blackbox::updateWiFi();
 }
 
 void Blackbox::updateScreen() {
@@ -126,14 +142,47 @@ void Blackbox::updateScreen() {
   display.print(F("IP: "));
   display.println(WiFi.softAPIP());
   display.print(F("Connected: "));
-  display.println(_connectionStatus);
+  if (_connectionStatus) {
+    display.println("Yes");
+  } else {
+    display.println("No");
+  }
+
+  if (!_clientConnected) {
+    display.drawBitmap(111, 47, notconnected, 16, 16, WHITE);
+  }
+  
   display.display();
+}
+
+void Blackbox::updateWiFi() {
+  if (client) {
+    _clientConnected = true;
+    if (client.connected()) {
+      while (client.available()>0) {
+        char c = client.read();
+        Serial.println(c);
+      }
+    } else {
+      client.stop();
+      Serial.println("Client disconnected");
+      _clientConnected = false;
+    }
+  } else {
+    client = wifiServer.accept();
+  }
+
+  if (WiFi.softAPgetStationNum() == 0) {
+    _clientConnected = false;
+  }
+  
+  
 }
 
 
 // Connection ping
 void Blackbox::ping() {
-  pulse(10);
+  Blackbox::send((int*)pingMessage, 8);
 }
 
 void Blackbox::receive(int* buffer, int size, int timeout) {
@@ -145,10 +194,11 @@ void Blackbox::receive(int* buffer, int size, int timeout) {
     // Timeout
     if (millis() - lastMillis >= timeout) {
       Serial.println("Timed out.");
+      buffer[i] = -1;
       break;
     }
     // Pulse high (start)
-    if (digitalRead(_dataIn)) {
+    if (digitalRead(_dataIn) && startPulse == 0) {
       // Reset timeout
       lastMillis = millis();
       // Set start of pulse
@@ -159,7 +209,6 @@ void Blackbox::receive(int* buffer, int size, int timeout) {
       pulseTime = millis() - startPulse;
       // Reset pulse start time
       startPulse = 0;
-
       if (pulseTime == 10) {
         buffer[i] = 0;
       } else if (pulseTime == 20) {
@@ -168,8 +217,29 @@ void Blackbox::receive(int* buffer, int size, int timeout) {
 
       i++;
       if (i >= size - 1) {
+        buffer[size - 1] = -1;
         break;
       }
+    }
+  }
+}
+
+// Will only check from the beginning
+bool Blackbox::isMessage(int* buffer, int bufferSize, int* check, int checkSize) {
+  for (int i = 0; i < checkSize; i++) {
+    if (buffer[i] != check[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void Blackbox::send(int* message, int length) {
+  for (int i = 0; i < length; i++) {
+    if (message[i] == 0) {
+      pulse(10);
+    } else if (message[i] == 1) {
+      pulse(20);
     }
   }
 }
