@@ -1,5 +1,9 @@
 #include "Arduino.h"
 #include "Blackbox.h"
+#include <Wifi.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 const uint8_t PROGMEM logo[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -75,4 +79,21 @@ Blackbox::Blackbox(int dataOut, int dataIn, int statusPin) {
     _dataOut = dataOut;
     _dataIn = dataIn;
     _statusPin = statusPin;
+
+    Adafruit_SSD1306 display(128, 64, &Wire, -1);
+
+
+}
+
+void Blackbox::begin() {
+
+}
+
+void Blackbox::pulse(int ms) {
+    digitalWrite(dataOut, HIGH);
+    digitalWrite(statusPin, HIGH);
+    delay(ms);
+    digitalWrite(dataOut, LOW);
+    digitalWrite(statusPin, LOW);
+    delay(10); // Off delay will always be 10ms
 }
