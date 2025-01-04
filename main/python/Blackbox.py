@@ -7,11 +7,13 @@ class Blackbox:
         self.pulseStart = 0
 
         self.plusMinus = 100 # in microseconds
-        self.timeOut = 100000 # in microseconds
+        self.timeOut = 300000 # in microseconds
 
         self.isConnected = False
+        self.isDownloading = False
 
         self.backgroundThreadReceiver = Thread(self.__backgroundThreadReceiver)
+        print("hello")
     
     def __backgroundThreadReceiver(self):
         pulseTime = 0
@@ -37,11 +39,27 @@ class Blackbox:
                     buffer.append(1)
             # If pulses timed out, decode buffer
             if self.timer.system_high_res() - lastTime >= self.timeOut:
+                
+                # If we are downloading
+                if len(buffer) != 0 and self.isDownloading:
+                    print(''.join(str(x) for x in buffer))
+                    # The download is finished
+                    self.isDownloading = False
+
+                    # Send received number of bits for redunancy (horrible data loss checking fr)
+                    print(len(buffer))
+                    print("sending length received")
+                    tempThread = Thread(self.__backgroundThreadSender, ([int(x) for x in '{0:08b}'.format(len(buffer))],))
+
                 if len(buffer) != 0 and buffer == [1, 1, 1, 1, 0, 0, 0, 0]:
                     print("not connected.. sending handshake")
                     tempThread = Thread(self.__backgroundThreadSender, (buffer.copy(),))
                     self.isConnected = True
-                
+                elif len(buffer) != 0 and buffer == [1, 0, 0, 1]:
+                    print("we are about to download a program")
+                    tempThread = Thread(self.__backgroundThreadSender, ([0, 1, 1, 0],))
+                    self.isDownloading = True
+
                 # Reset buffer
                 buffer.clear()
 
